@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualizador Matemático Interativo</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.150.1/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-panel: #1e1e1e;
+            --bg-canvas: #242424;
+            --text-light: #f0f0f0;
+            --text-medium: #a0a0a0;
+            --border-color: #3a3a3a;
+            --primary: #00aaff;
+            --primary-dark: #007acc;
+            --accent: #ff5722;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 900px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 600;
+            color: var(--text-light);
+        }
+        
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            color: var(--primary);
+            text-align: center;
+        }
+
+        nav {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 10px;
+            background-color: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        nav button {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            font-weight: 500;
+            color: var(--text-medium);
+            background-color: transparent;
+            border: 2px solid transparent;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        nav button svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--text-medium);
+            transition: all 0.3s ease;
+        }
+
+        nav button:hover {
+            color: var(--text-light);
+        }
+        nav button:hover svg {
+            stroke: var(--text-light);
+        }
+
+        nav button.active {
+            color: var(--primary);
+            background-color: rgba(0, 170, 255, 0.1);
+            border-color: var(--primary-dark);
+        }
+        nav button.active svg {
+            stroke: var(--primary);
+        }
+
+        .viewer-content {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .viewer-content.active { display: flex; }
+        
+        .controls {
+            width: 100%;
+            padding: 20px;
+            background-color: var(--bg-panel);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 15px 25px;
+        }
+        
+        .controls label { font-weight: 500; }
+
+        .controls select, .controls input[type="number"] {
+            font-size: 1rem;
+            font-family: inherit;
+            background-color: #333;
+            color: var(--text-light);
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 10px 15px;
+            transition: border-color 0.2s;
+        }
+        .controls select:focus, .controls input[type="number"]:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .controls input[type="number"] { width: 80px; }
+
+        .controls input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 150px;
+            height: 8px;
+            background: #444;
+            border-radius: 5px;
+            outline: none;
+            cursor: pointer;
+        }
+        .controls input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .controls input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: var(--primary);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .canvas-container {
+            border: 2px solid var(--primary-dark);
+            border-radius: 12px;
+            overflow: hidden;
+            line-height: 0;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 800px;
+            aspect-ratio: 4 / 3;
+            position: relative;
+        }
+        
+        canvas, #scene-3d-container {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background-color: var(--bg-canvas);
+        }
+        
+        .info-panel {
+            background: var(--bg-panel);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.1rem;
+            line-height: 1.8;
+            width: 100%;
+        }
+        .info-panel .prop { color: var(--text-medium); }
+        .info-panel .value { color: var(--text-light); font-weight: bold; }
+        
+        footer {
+            margin-top: 40px;
+            color: var(--text-medium);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Visualizador Matemático Interativo</h1>
+    </header>
+
+    <div class="main-container">
+        <nav id="main-nav">
+            <button data-viewer="viewer-2d" class="active">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                Funções 2D
+            </button>
+            <button data-viewer="viewer-circle">
+                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                Círculo
+            </button>
+            <button data-viewer="viewer-complex">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2z"></path><path d="M12 12h.01"></path><path d="M12 18v-4"></path><path d="M12 10V8"></path></svg>
+                Complexos
+            </button>
+            <button data-viewer="viewer-3d">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                Superfícies 3D
+            </button>
+        </nav>
+
+        <div id="viewer-2d" class="viewer-content active">
+            <h2>Gráficos de Funções Trigonométricas</h2>
+            <div class="controls">
+                <label for="select-2d">Função y = f(x):</label>
+                <select id="select-2d">
+                    <option value="none">Selecione...</option>
+                    <option value="sin">sin(x)</option>
+                    <option value="cos">cos(x)</option>
+                    <option value="tan">tan(x)</option>
+                    <option value="csc">csc(x)</option>
+                    <option value="sec">sec(x)</option>
+                    <option value="cot">cot(x)</option>
+                    <option value="arcsin">arcsin(x)</option>
+                    <option value="arccos">arccos(x)</option>
+                    <option value="arctan">arctan(x)</option>
+                </select>
+            </div>
+            <div class="canvas-container"><canvas id="canvas-2d"></canvas></div>
+        </div>
+
+        <div id="viewer-circle" class="viewer-content">
+            <h2>Círculo Trigonométrico Interativo</h2>
+            <div class="controls">
+                <label for="slider-angle">Ângulo (θ):</label>
+                <input type="range" id="slider-angle" min="0" max="360" value="45" step="1">
+                <span id="angle-display">45°</span>
+            </div>
+            <div class="canvas-container"><canvas id="canvas-circle"></canvas></div>
+        </div>
+
+        <div id="viewer-complex" class="viewer-content">
+            <h2>Plano de Argand-Gauss</h2>
+            <div class="controls">
+                <label for="input-real">z =</label>
+                <input type="number" id="input-real" value="3" step="0.1">
+                <label for="input-imag"> + </label>
+                <input type="number" id="input-imag" value="2" step="0.1">
+                <label>i</label>
+            </div>
+            <div class="canvas-container"><canvas id="canvas-complex"></canvas></div>
+            <div class="info-panel" id="complex-info"></div>
+        </div>
+        
+        <div id="viewer-3d" class="viewer-content">
+            <h2>Visualizador de Superfícies 3D</h2>
+             <div class="controls">
+                <label for="select-3d">Função z = f(x, y):</label>
+                <select id="select-3d">
+                    <option value="none">Selecione...</option>
+                    <option value="waves">sin(x) + cos(y)</option>
+                    <option value="ripple">sin(sqrt(x²+y²))</option>
+                    <option value="saddle">x² - y²</option>
+                    <option value="peaks">cos(x) * sin(y)</option>
+                </select>
+            </div>
+            <div class="canvas-container" id="scene-3d-container"></div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Desenvolvido como projeto de matemática e programação. Julho, 2025.</p>
+    </footer>
+
+    <script type="module">
+        const AppManager = {
+            viewers: {},
+            activeViewer: null,
+
+            init() {
+                const nav = document.getElementById('main-nav');
+                nav.addEventListener('click', (e) => {
+                    const button = e.target.closest('button');
+                    if (button) {
+                        const viewerId = button.dataset.viewer;
+                        this.showViewer(viewerId);
+                        
+                        nav.querySelector('.active').classList.remove('active');
+                        button.classList.add('active');
+                    }
+                });
+
+                this.registerViewer('viewer-2d', Viewer2D);
+                this.registerViewer('viewer-circle', ViewerCircle);
+                this.registerViewer('viewer-complex', ViewerComplex);
+                this.registerViewer('viewer-3d', Viewer3D);
+
+                this.showViewer('viewer-2d');
+            },
+
+            registerViewer(id, constructor) {
+                const element = document.getElementById(id);
+                this.viewers[id] = new constructor(element);
+            },
+
+            showViewer(id) {
+                if (this.activeViewer) {
+                    this.activeViewer.element.classList.remove('active');
+                    if (this.activeViewer.deactivate) this.activeViewer.deactivate();
+                }
+
+                const viewer = this.viewers[id];
+                viewer.element.classList.add('active');
+                if (viewer.activate) viewer.activate();
+                this.activeViewer = viewer;
+            }
+        };
+
+        class CanvasViewer {
+            constructor(element, canvasId) {
+                this.element = element;
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext('2d');
+                window.addEventListener('resize', () => this.resizeCanvas());
+            }
+            
+            resizeCanvas() {
+                const container = this.canvas.parentElement;
+                this.canvas.width = container.clientWidth;
+                this.canvas.height = container.clientHeight;
+                if(this.draw) this.draw();
+            }
+
+            activate() { this.resizeCanvas(); }
+            
+            drawGrid(centerX, centerY, scale, showNumbers = true) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.font = "14px 'Poppins'";
+                this.ctx.fillStyle = '#999';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.strokeStyle = '#3a3a3a';
+                this.ctx.lineWidth = 1;
+
+                for (let x = 0; x <= this.canvas.width; x += scale) { this.ctx.beginPath(); this.ctx.moveTo(x, 0); this.ctx.lineTo(x, this.canvas.height); this.ctx.stroke(); }
+                for (let y = 0; y <= this.canvas.height; y += scale) { this.ctx.beginPath(); this.ctx.moveTo(0, y); this.ctx.lineTo(this.canvas.width, y); this.ctx.stroke(); }
+                
+                this.ctx.strokeStyle = '#007acc';
+                this.ctx.lineWidth = 2;
+                
+                this.ctx.beginPath(); this.ctx.moveTo(0, centerY); this.ctx.lineTo(this.canvas.width, centerY); this.ctx.stroke();
+                this.ctx.beginPath(); this.ctx.moveTo(centerX, 0); this.ctx.lineTo(centerX, this.canvas.height); this.ctx.stroke();
+
+                if(showNumbers){
+                    for (let i = -Math.floor(centerX / scale); i <= Math.floor(centerX / scale); i++) { if (i === 0) continue; this.ctx.fillText(i, centerX + i * scale, centerY + 20); }
+                    for (let i = -Math.floor(centerY / scale); i <= Math.floor(centerY / scale); i++) { if (i === 0) continue; this.ctx.fillText(i, centerX - 20, centerY - i * scale); }
+                }
+            }
+        }
+
+        class Viewer2D extends CanvasViewer {
+            constructor(element) {
+                super(element, 'canvas-2d');
+                this.select = document.getElementById('select-2d');
+                this.scale = 50;
+                this.functions = { sin: Math.sin, cos: Math.cos, tan: Math.tan, csc: x => 1 / Math.sin(x), sec: x => 1 / Math.cos(x), cot: x => 1 / Math.tan(x), arcsin: Math.asin, arccos: Math.acos, arctan: Math.atan };
+                this.select.addEventListener('change', () => this.draw());
+            }
+            
+            draw() {
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                this.drawGrid(centerX, centerY, this.scale);
+
+                const selectedFuncKey = this.select.value;
+                const func = this.functions[selectedFuncKey];
+                if (!func) return;
+
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = '#ff5722';
+                this.ctx.lineWidth = 3;
+                let firstPoint = true;
+                for (let cx = 0; cx < this.canvas.width; cx++) {
+                    const mx = (cx - centerX) / this.scale;
+                    const my = func(mx);
+                    const cy = centerY - my * this.scale;
+                    if (isFinite(cy)) {
+                        if (firstPoint) { this.ctx.moveTo(cx, cy); firstPoint = false; } else { this.ctx.lineTo(cx, cy); }
+                    } else { firstPoint = true; }
+                }
+                this.ctx.stroke();
+            }
+        }
+
+        class ViewerCircle extends CanvasViewer {
+            constructor(element) {
+                super(element, 'canvas-circle');
+                this.slider = document.getElementById('slider-angle');
+                this.display = document.getElementById('angle-display');
+                this.slider.addEventListener('input', () => this.draw());
+            }
+
+            draw() {
+                const angleDeg = this.slider.value;
+                const angleRad = angleDeg * Math.PI / 180;
+                this.display.textContent = `${angleDeg}°`;
+                
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                const radius = Math.min(centerX, centerY) * 0.7;
+                
+                this.drawGrid(centerX, centerY, radius, false);
+
+                this.ctx.beginPath(); this.ctx.strokeStyle = '#ccc'; this.ctx.lineWidth = 2; this.ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI); this.ctx.stroke();
+                
+                const x = centerX + radius * Math.cos(angleRad);
+                const y = centerY - radius * Math.sin(angleRad);
+                
+                this.ctx.beginPath(); this.ctx.strokeStyle = '#ff5722'; this.ctx.lineWidth = 3; this.ctx.moveTo(x, y); this.ctx.lineTo(x, centerY); this.ctx.stroke();
+                this.ctx.beginPath(); this.ctx.strokeStyle = '#1e90ff'; this.ctx.lineWidth = 3; this.ctx.moveTo(x, centerY); this.ctx.lineTo(centerX, centerY); this.ctx.stroke();
+                this.ctx.beginPath(); this.ctx.strokeStyle = '#f0f0f0'; this.ctx.lineWidth = 3; this.ctx.moveTo(centerX, centerY); this.ctx.lineTo(x, y); this.ctx.stroke();
+                this.ctx.beginPath(); this.ctx.fillStyle = '#f0f0f0'; this.ctx.arc(x, y, 5, 0, 2 * Math.PI); this.ctx.fill();
+            }
+        }
+        
+        class ViewerComplex extends CanvasViewer {
+            constructor(element) {
+                super(element, 'canvas-complex');
+                this.inputReal = document.getElementById('input-real');
+                this.inputImag = document.getElementById('input-imag');
+                this.infoPanel = document.getElementById('complex-info');
+                this.scale = 50;
+                [this.inputReal, this.inputImag].forEach(input => input.addEventListener('input', () => this.draw()));
+            }
+
+            draw() {
+                const a = parseFloat(this.inputReal.value) || 0;
+                const b = parseFloat(this.inputImag.value) || 0;
+                
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                
+                this.drawGrid(centerX, centerY, this.scale);
+
+                const cx = centerX + a * this.scale;
+                const cy = centerY - b * this.scale;
+                
+                this.ctx.beginPath(); this.ctx.strokeStyle = '#ff5722'; this.ctx.lineWidth = 3; this.ctx.moveTo(centerX, centerY); this.ctx.lineTo(cx, cy); this.ctx.stroke();
+                this.ctx.beginPath(); this.ctx.fillStyle = '#ff5722'; this.ctx.arc(cx, cy, 6, 0, 2 * Math.PI); this.ctx.fill();
+
+                this.updateInfo(a, b);
+            }
+
+            updateInfo(a, b) {
+                const r = Math.sqrt(a*a + b*b);
+                const theta = Math.atan2(b, a);
+                const thetaDeg = theta * 180 / Math.PI;
+
+                this.infoPanel.innerHTML = `
+                    <div><span class="prop">Retangular: </span><span class="value">${a.toFixed(2)} + ${b.toFixed(2)}i</span></div>
+                    <div><span class="prop">Polar (graus): </span><span class="value">${r.toFixed(2)}(cos(${thetaDeg.toFixed(2)}°) + i sin(${thetaDeg.toFixed(2)}°))</span></div>
+                    <div><span class="prop">Exponencial: </span><span class="value">${r.toFixed(2)}e<sup>${theta.toFixed(2)}i</sup></span></div>
+                `;
+            }
+        }
+
+        class Viewer3D {
+            constructor(element) {
+                this.element = element;
+                this.container = document.getElementById('scene-3d-container');
+                this.select = document.getElementById('select-3d');
+                this.isInitialized = false;
+                this.animationFrameId = null;
+                this.THREE = null;
+                
+                this.functions = {
+                    waves: (x, y) => Math.sin(x*1.5) + Math.cos(y*1.5),
+                    ripple: (x, y) => 2 * Math.sin(Math.sqrt(x*x + y*y) - performance.now() * 0.001),
+                    saddle: (x, y) => (x*x - y*y) * 0.1,
+                    peaks: (x, y) => Math.cos(x) * Math.sin(y) * 2,
+                };
+                
+                this.select.addEventListener('change', () => this.drawSurface());
+            }
+
+            async init() {
+                this.THREE = await import('three');
+                const { OrbitControls } = await import('three/addons/controls/OrbitControls.js');
+                
+                this.scene = new this.THREE.Scene();
+                this.scene.background = new this.THREE.Color(0x1a1a1a);
+
+                this.camera = new this.THREE.PerspectiveCamera(60, this.container.clientWidth / this.container.clientHeight, 0.1, 1000);
+                this.camera.position.set(10, 8, 10);
+
+                this.renderer = new this.THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+                this.container.appendChild(this.renderer.domElement);
+                
+                this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                this.controls.autoRotate = true;
+                this.controls.autoRotateSpeed = 0.5;
+
+                this.scene.add(new this.THREE.AmbientLight(0xffffff, 0.4));
+                const dirLight = new this.THREE.DirectionalLight(0xffffff, 1);
+                dirLight.position.set(5, 10, 7.5);
+                this.scene.add(dirLight);
+                
+                this.scene.add(new this.THREE.AxesHelper(10));
+                this.scene.add(new this.THREE.GridHelper(20, 20, 0x444444, 0x444444));
+
+                window.addEventListener('resize', () => this.onResize(), false);
+                this.isInitialized = true;
+            }
+
+            activate() {
+                if (!this.isInitialized) {
+                    this.init().then(() => {
+                        this.drawSurface();
+                        this.animate();
+                    });
+                } else {
+                    this.onResize();
+                    this.animate();
+                }
+            }
+            
+            deactivate() { if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId); }
+
+            animate() {
+                this.animationFrameId = requestAnimationFrame(() => this.animate());
+                this.controls.update();
+                this.renderer.render(this.scene, this.camera);
+            }
+            
+            onResize() {
+                if (!this.isInitialized) return;
+                this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+            }
+
+            drawSurface() {
+                if (!this.isInitialized || !this.THREE) return;
+                if (this.currentSurface) this.scene.remove(this.currentSurface);
+
+                const funcKey = this.select.value;
+                const func = this.functions[funcKey];
+                if (!func) return;
+
+                const THREE = this.THREE;
+                const geometry = new THREE.PlaneGeometry(15, 15, 100, 100);
+                const material = new THREE.MeshStandardMaterial({ 
+                    color: 0x007acc, 
+                    side: THREE.DoubleSide,
+                    metalness: 0.3,
+                    roughness: 0.4
+                });
+                
+                const vertices = geometry.attributes.position.array;
+                for (let i = 0; i < vertices.length; i += 3) {
+                    vertices[i+2] = func(vertices[i], vertices[i+1]);
+                }
+                geometry.attributes.position.needsUpdate = true;
+                geometry.computeVertexNormals();
+                
+                this.currentSurface = new THREE.Mesh(geometry, material);
+                this.currentSurface.rotation.x = -Math.PI / 2;
+                this.scene.add(this.currentSurface);
+            }
+        }
+        
+        window.onload = () => {
+            AppManager.viewers['viewer-2d'] = new Viewer2D(document.getElementById('viewer-2d'));
+            AppManager.viewers['viewer-circle'] = new ViewerCircle(document.getElementById('viewer-circle'));
+            AppManager.viewers['viewer-complex'] = new ViewerComplex(document.getElementById('viewer-complex'));
+            AppManager.viewers['viewer-3d'] = new Viewer3D(document.getElementById('viewer-3d'));
+            
+            AppManager.init();
+        };
+    </script>
+</body>
+</html>
